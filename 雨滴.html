@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+            text-decoration: none;
+            list-style: none;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .notice {
+            position: absolute;
+            right: 10%;
+            left: 10%;
+            display: flex;
+            justify-content: center;
+            color: #fff;
+            animation: neon 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes neon {
+            0%,
+            100% {
+                text-shadow: 0 0 20px #fff, 0 0 100px #fff, 0 0 20px #fff;
+            }
+            50% {
+                text-shadow: 0 0 50px #fff, 0 0 150px #fff, 0 0 50px #fff;
+                color: #0e212c;
+            }
+        }
+
+        #canvas {
+            z-index: -99;
+        }
+
+        .container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 95vh;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .container h1 {
+            text-align: center;
+            position: relative;
+            top: 50%;
+            z-index: 1;
+        }
+
+        .article {
+            margin: auto;
+            display: flex;
+            flex-flow: column;
+            justify-content: center;
+            align-items: center;
+            width: 40vw;
+            height: 100vh;
+            opacity: .5;
+            color: #fff;
+        }
+
+        footer div {
+            width: 98%;
+            display: flex;
+            justify-content: center;
+            position: absolute;
+            bottom: 2px;
+            left: 1%;
+            right: 1%;
+            color: #fff;
+        }
+
+        @media screen and (max-width:678px) {
+            .article {
+                width: 70vw;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas" style="position: absolute; height: 100%; width:100%;"></canvas>
+    <div class="notice">
+        <p>IP可以移動喔!</p>
+    </div>
+    <div class="container" id="IP">
+        <h1></h1>
+    </div>
+    <div class="article">
+        <h2></h2>
+        <h3></h3>
+    </div>
+    <footer>
+        <div>
+            <p>
+                &copy;Copyright 2022 <a href="http://ntc.im/" target="_blank" style="color:blue"> NTC.im.</a> All rights
+                reserved.
+            </p>
+
+        </div>
+    </footer>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"
+        integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk=" crossorigin="anonymous"></script>
+    <script>
+        // 背景
+        window.onload = main;
+        function main() {
+            // 獲取canvas元素
+            var canvasEl = document.getElementById('canvas');
+            // getContext是HTML內建的對象
+            var ctx = canvasEl.getContext('2d');
+            // canvas畫布的 背景顏色
+            var backgroundColor = '#0e212c';
+
+            // canvas畫布的寬 等於 可視區域的寬
+            canvasEl.width = canvasEl.clientWidth;
+            // canvas畫布的高 等於 可視區域的高
+            canvasEl.height = canvasEl.clientHeight;
+
+            // 保存小水珠的數組
+            // 雨滴下落後散成小水珠，小水珠就是一些圓弧
+            var dropList = [];
+
+            // 重力
+            // 雨滴下落後散成小水珠，小水珠會先上升後下降，主要是因為 gravity 這個變量的緣故
+            var gravity = 0.5;
+
+            // 保存雨滴的數組
+            // 每個雨滴 都是 畫的一條線 
+            var linelist = [];
+
+            // 保存滑鼠的坐標 
+            // mousePos[0] 代表x軸的值，mousePos[1] 代表y軸的值 
+            var mousePos = [0, 0];
+
+            // 跟隨滑鼠， mouseDis 大小區域內的雨滴會消失，形成散落效果
+            // 以mousePos為圓心，mouseDis為半徑，這個範圍內的雨滴 都會散開，形成許多小水珠
+            var mouseDis = 35;
+
+            // 更新一次動畫，畫lineNum 條雨滴，lineNum 值越大，下雨就越密集
+            var lineNum = 3;
+
+            // 跟隨滑鼠方向 變化下雨方向的 速度
+            // 滑鼠移動後，下雨的方向 會慢慢改變，主要靠speedx 這個變量
+            var speedx = 0;
+
+            // maxspeedx 為 speedx 可以取的最大值
+            // 當 speedx = maxspeedx時，下雨方向 會 隨滑鼠移動方向立即改變
+            var maxspeedx = 0;
+
+            // 頁面大小發生變化時，重置canvas畫布大小(clientWidth可視畫面的寬度)
+            window.onresize = function () {
+                canvasEl.width = canvasEl.clientWidth;
+                canvasEl.height = canvasEl.clientHeight;
+            }
+
+            //移動滑鼠觸發事件
+            window.onmousemove = function (e) {
+                //  設置mousePos 等於 滑鼠坐標
+                //  e.clientX 為距離 瀏覽器窗口可視區域 左邊的距離
+                //  e.clientY 為距離 瀏覽器窗口可視區域 上邊的距離
+                mousePos[0] = e.clientX;
+                mousePos[1] = e.clientY;
+                // console.log(canvasEl.clientWidth)
+                // 通過滑鼠位置，設置 maxspeedx的值，取值範圍是 -1 到 1(從中間劃一條線，分為左半邊和右半邊)
+                // maxspeedx的值，關係到 
+                // 1、雨滴的方向
+                // 2、雨滴下落的方向
+                // 3、雨滴下落方向 跟隨 滑鼠移動方向變化的速度
+                // 4、小水珠的移動方向
+                // 值越接近1，表示方向越向右
+                // 值越接近-1，表示方向越向左
+                maxspeedx = (e.clientX - canvasEl.clientWidth / 2) / (canvasEl.clientWidth / 2);
+                // console.log(maxspeedx)//1~-1
+            }
+
+            // 根據參數，返回一個rgb顏色，用於給雨滴設置顏色
+            function getRgb(r, g, b) {
+                return "rgb(" + r + "," + g + "," + b + ")";
+            }
+
+            // 畫 一滴雨（一條線）
+            function createLine(e) {
+                // 隨機生成 雨滴的長度
+                var temp = 0.25 * (50 + Math.random() * 100);
+                // 一個 line 對象，代表一個雨滴
+                var line = {
+                    // 雨滴下落速度  
+                    speed: 4.5 * (Math.random() * 6 + 3),
+                    // 判斷是否刪除，值為true就刪除
+                    die: false,
+                    // 雨滴x坐標 
+                    posx: e,
+                    // 雨滴y坐標 
+                    posy: -50,
+                    // 雨滴的長度
+                    h: temp,
+                    // 雨滴的顏色
+                    color: getRgb(Math.floor(temp * 255 / 75), Math.floor(temp * 255 / 75), Math.floor(temp * 255 / 75))
+                };
+                // 把創建好的line（雨滴）對象，添加到保存雨滴的數組
+                linelist.push(line);
+            }
+
+            // 畫一個小水珠（雨滴落地散開後的小水珠就是一個個的圓弧）
+            function createDrop(x, y) {
+                // 一個 drop 對象，代表一個圓弧
+                var drop = {
+                    // 判斷是否刪除，值為true就刪除
+                    die: false,
+                    // 圓弧圓心的x坐標 
+                    posx: x,
+                    // 圓弧圓心的y坐標 
+                    posy: y,
+                    // vx 表示 x軸的值 變化的速度
+                    vx: (Math.random() - 0.5) * 8,
+                    // vy 表示 y軸的值 變化的速度 取值範圍：-3 到 -9
+                    vy: Math.random() * (-6) - 3,
+                    // 圓弧的半徑
+                    radius: Math.random() * 1.5 + 1
+                };
+                return drop;
+            }
+
+            // 畫一定數量的小水珠
+            function madedrops(x, y) {
+                // 隨機生成一個數 maxi
+                // maxi 代表要畫小水珠的數量
+                var maxi = Math.floor(Math.random() * 5 + 5);
+                for (var i = 0; i < maxi; i++) {
+                    dropList.push(createDrop(x, y));
+                }
+            }
+
+            // 開始調用update函數，更新動畫
+            window.requestAnimationFrame(update);
+            // 更新動畫
+            function update() {
+                // 如果保存小水珠的數組有內容
+                if (dropList.length > 0) {
+                    // 遍歷保存小水珠的數組
+                    dropList.forEach(function (e) {
+                        //設置e.vx，vx表示x坐標變化的速度
+                        // (speedx)/2 是為了，讓小水珠 在x軸的移動距離短一點，看上去更真實點
+                        // 也使 小水珠的移動方向 和 雨滴方向，雨滴下落方向，滑鼠移動方向相同
+                        e.vx = e.vx + (speedx / 2);
+                        e.posx = e.posx + e.vx;
+
+                        //設置e.vy，vy表示y坐標變化的速度
+                        // e.vy的範圍是-3 到 -9，而這時e.posy（y坐標）一定是正值，所以 e.posy的值會先減小後增大
+                        // 也就是實現 雨滴散成小水珠，小水珠會先上升後下降的效果
+                        e.vy = e.vy + gravity;
+                        e.posy = e.posy + e.vy;
+
+                        // 如果 小水珠y坐標 大於 可視區域的高度，設置die屬性為true
+                        // 小水珠如果超出可視區域就刪除掉
+                        if (e.posy > canvasEl.clientHeight) {
+                            e.die = true;
+                        }
+                    });
+                }
+
+                // 刪除 die屬性為ture 的數組成員
+                // 可視區域外的小水珠刪除掉
+                for (var i = dropList.length - 1; i >= 0; i--) {
+                    if (dropList[i].die) {
+                        dropList.splice(i, 1);
+                    }
+                }
+
+                // 設置下雨方向變換的速度，取值範圍： -1 到 1
+                // 當 speedx = maxspeedx時，下雨方向 會 隨滑鼠移動方向立即改變
+                speedx = speedx + (maxspeedx - speedx) / 50;
+
+                // 根據lineNum的值，畫一定數量雨滴
+                for (var i = 0; i < lineNum; i++) {
+                    // 調用createLine 函數，參數是雨滴x坐標
+                    createLine(Math.random() * 2 * canvasEl.width - (0.5 * canvasEl.width));
+                }
+
+                // 設置結束線，也就是雨滴散開 形成許多小水珠的位置
+                var endLine = canvasEl.clientHeight - Math.random() * canvasEl.clientHeight / 5;
+
+                // 遍歷保存雨滴的數組
+                linelist.forEach(function (e) {
+
+                    // 利用勾股定理 確定一個範圍，在這個範圍內雨滴會散開形成小水珠
+                    // e.posx + speedx * e.h 是雨滴x坐標
+                    // e.posy + e.h 是雨滴y坐標
+                    var dis = Math.sqrt(((e.posx + speedx * e.h) - mousePos[0]) * ((e.posx + speedx * e.h) - mousePos[0]) + (e.posy + e.h - mousePos[1]) * (e.posy + e.h - mousePos[1]));
+
+                    // 如果在mouseDis區域內，就刪除雨滴，畫一些小水珠（圓弧）
+                    // 實現滑鼠碰到雨滴，雨滴散成小水珠的效果
+                    if (dis < mouseDis) {
+                        // 刪除 雨滴
+                        e.die = true;
+                        // 畫一些小水珠（圓弧）
+                        madedrops(e.posx + speedx * e.h, e.posy + e.h);
+                    }
+
+                    // 如果雨滴超過 結束線，刪除雨滴，畫一些小水珠（圓弧）
+                    if ((e.posy + e.h) > endLine) {
+                        e.die = true;
+                        madedrops(e.posx + speedx * e.h, e.posy + e.h);
+                    }
+
+                    // 如果 雨滴 y坐標 大於 可視區域的高度，設置die屬性為true
+                    // 如果 雨滴 超出可視區域就刪除掉
+                    if (e.posy >= canvasEl.clientHeight) {
+                        e.die = true;
+                    } else {
+                        // 逐漸增加 雨滴 y坐標的值
+                        e.posy = e.posy + e.speed;
+
+                        // 變化雨滴 x坐標
+                        // * speedx 用來控制雨滴 下落 方向
+                        // 使 雨滴下落方向 和 滑鼠移動方向相同
+                        e.posx = e.posx + e.speed * speedx;
+                    }
+                });
+
+                // 刪除 die屬性為ture 的數組成員
+                // 滑鼠區域內的，超過結束線的，可視區域外的雨滴刪除掉
+                for (var i = linelist.length - 1; i >= 0; i--) {
+                    if (linelist[i].die) {
+                        linelist.splice(i, 1);
+                    }
+                }
+
+                // 渲染
+                render();
+                // 遞歸調用 update，實現動畫效果
+                window.requestAnimationFrame(update);
+            }
+
+            // 渲染
+            function render() {
+                // 畫一個和可視區域一樣大的矩形
+                ctx.fillStyle = backgroundColor;
+                ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+
+                // 畫雨滴效果
+                ctx.lineWidth = 5;
+                linelist.forEach(function (line) {
+                    ctx.strokeStyle = line.color;
+                    ctx.beginPath();
+                    ctx.moveTo(line.posx, line.posy);
+
+                    // * speedx 用來控制雨滴方向
+                    // 使 雨滴方向 和 滑鼠移動方向相同
+                    ctx.lineTo(line.posx + line.h * speedx, line.posy + line.h);
+                    ctx.stroke();
+                });
+
+                // 畫雨滴散開形成小水珠效果
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "#fff";
+                dropList.forEach(function (e) {
+                    ctx.beginPath();
+                    ctx.arc(e.posx, e.posy, e.radius, Math.random() * Math.PI * 2, 1 * Math.PI);
+                    ctx.stroke();
+                });
+
+                // 解開註釋，可看見滑鼠範圍
+                /*
+                  ctx.beginPath();
+                  ctx.arc(mousePos[0], mousePos[1], mouseDis, 0, 2 * Math.PI);
+                  ctx.stroke();
+                */
+            }
+        }
+
+        $(document).ready(function () {
+            // 頂陶賣叮噹
+            // 抓IP嘍
+            $.ajax({
+                url: "https://api.ipify.org?format=json",
+                method: "GET",
+                dataType: "JSON",
+                success: function (res) {
+                    // console.log(res.ip)
+                    let h1 = document.querySelector('h1')
+                    h1.innerHTML = 'IP:' + res.ip
+                    function getRandom(x) {
+                        Math.floor(Math.random() * x);
+                        if (Math.floor(Math.random() * x) <= 2) {
+                            $("h2").html(`台南牛肉湯`);
+                            $("h3").html(`於外縣市的民眾來說，台南的牛肉湯文化獨具一格，除了不符合日常作息的營業時間，還包括漏夜摸黑排隊的人龍、沒有打烊時間而只有「賣完為止」、色澤透明卻味道濃郁的神奇湯頭，以及超軟嫩的粉紅色牛肉片，這些令人難以置信的情況，只能夠在台南看到！因此，如果去台南沒喝到牛肉湯，似乎就等於不曾去過。然而，作為當地特產，販賣牛肉湯的店家多不勝數，如何在短短兩天三夜的行程內，吃到最知名的店家？`)
+                        } else if (Math.floor(Math.random() * x) <= 4 && Math.floor(Math.random() * x) >= 2) {
+                            $("h2").html(`彰化肉圓`)
+                            $("h3").html(`肉圓是一種臺灣的特色街頭小吃，相傳彰化縣北斗鎮是肉圓的發源地，約誕生於19世紀末。其名稱源自於其外觀，一般為直徑六至八公分左右的半透明扁圓形，除了最常見的圓形造型之外，亦有三角形的北斗肉圓，但目前不若圓形肉圓普及。肉圓外皮是以地瓜粉、太白粉或在來米粉、樹薯粉等材料作成的半透明皮，其內餡以豬肉和豬絞肉為主，其他配料依據店家不同會有筍子、香菇、雞蛋、干貝或栗子等食材。烹調作法大略以彰化做為分界，彰化以北多用油炸油泡、彰化以南多為炊蒸。`)
+                        } else {
+                            $("h2").html(`滷肉飯`)
+                            $("h3").html(`滷肉飯在臺灣被視為極具台灣特色的民眾小吃，在全臺各地都有店家販售，南北有不同的意義。在北臺灣，滷肉飯為一種淋上含有煮熟碎豬肉或炒香肉臊（豬絞肉）及醬油滷汁的白飯菜餚，有時醬汁裡亦會有香菇丁等的成份在內，與炕肉飯不同，看起來像南臺灣肉臊飯；「滷肉飯」在臺灣南部是指有著滷汁塊狀肉的切丁滷肉飯，有些店家搭配筍乾醃蘿蔔乾，與彰化的大塊炕肉飯亦不盡相同。`)
+                        }
+                    }
+                    getRandom(6)
+                },
+                error: function (err) {
+                    console.log(err)
+                }
+            });
+            // 欸咖賣叮噹
+        })
+
+        // PC端拖動元素
+        let IP = document.querySelector('#IP')
+        // 當滑鼠按下就獲得滑鼠在盒子內的座標(滑鼠在盒子內的座標在移動時不會改變，但盒子距離整個頁面的距離會改變)
+        IP.addEventListener('mousedown', function (e) {
+            let x = e.pageX - IP.offsetLeft
+            let y = e.pageY - IP.offsetTop
+            // console.log(x,y)
+            // 滑鼠移動的時候，把滑鼠在頁面中的座標減去 滑鼠在盒子內的座標(固定)，就是要移動的距離(login的left & top)
+            document.addEventListener('mousemove', move)
+            function move(e) {
+                IP.style.left = e.pageX - x + 'px'
+                IP.style.top = e.pageY - y + 'px'
+                // console.log(e.pageX, e.pageY )
+                // console.log(login.style.left, login.style.top)
+            }
+            // 滑鼠鬆開則讓移動移除
+            document.addEventListener('mouseup', function () {
+                document.removeEventListener('mousemove', move)
+            })
+        })
+        //手機端拖動元素 
+        let startX = 0;//獲得手指初始座標
+        let startY = 0;
+        let x = 0//獲得盒子原來位置
+        let y = 0
+        IP.addEventListener('touchstart', function (e) {
+            startX = e.targetTouches[0].pageX
+            startY = e.targetTouches[0].pageY
+            x = this.offsetLeft
+            y = this.offsetTop
+        })
+        IP.addEventListener('touchmove', function (e) {
+            // 計算手指移動距離: 手指移動後座標-手指初始座標
+            let moveX = e.targetTouches[0].pageX - startX
+            let moveY = e.targetTouches[0].pageY - startY
+            // 移動盒子 盒子原來位置+手指移動距離
+            this.style.left = x + moveX + 'px'
+            this.style.top = y + moveY + 'px'
+            // 手指移動屏幕也會默認滾動，所以要阻止屏幕默認滾動e.preventDefault()
+            e.preventDefault();
+        })
+
+    </script>
+</body>
+
+</html>
